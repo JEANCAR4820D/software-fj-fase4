@@ -712,14 +712,226 @@ def ejecutar_simulacion():
 
 
 # ============================================================================
+#  MÓDULO 9: MENÚ INTERACTIVO (BONUS)
+#  Permite al usuario interactuar con el sistema desde la terminal.
+# ============================================================================
+# Se reutilizan TODAS las clases anteriores (Cliente, Servicio, Reserva,
+# GestorSoftwareFJ) y todo el manejo de excepciones. La diferencia es que
+# en lugar de simular operaciones automáticas, el usuario las elige.
+
+def pausa():
+    """Pequeña función auxiliar para pausar y esperar Enter."""
+    input("\nPresione ENTER para continuar...")
+
+
+def imprimir_menu():
+    """Imprime el menú principal en pantalla."""
+    print("\n" + "=" * 60)
+    print("        SISTEMA SOFTWARE FJ - MENÚ PRINCIPAL")
+    print("=" * 60)
+    print("  1. Registrar nuevo cliente")
+    print("  2. Crear nuevo servicio")
+    print("  3. Crear nueva reserva")
+    print("  4. Listar clientes registrados")
+    print("  5. Listar servicios disponibles")
+    print("  6. Listar reservas")
+    print("  7. Confirmar y procesar una reserva")
+    print("  0. Salir del programa")
+    print("=" * 60)
+
+
+def opcion_registrar_cliente(gestor):
+    """Pide datos al usuario y registra un cliente. Maneja errores."""
+    print("\n--- REGISTRO DE NUEVO CLIENTE ---")
+    try:
+        identificador = input("Identificador (ej. CLI010): ").strip()
+        nombre = input("Nombre completo: ").strip()
+        documento = input("Documento (6-12 dígitos): ").strip()
+        email = input("Correo electrónico: ").strip()
+        telefono = input("Teléfono (7-10 dígitos): ").strip()
+        # Se crea el cliente; cualquier dato inválido lanza excepción
+        cliente = Cliente(identificador, nombre, documento, email, telefono)
+        gestor.registrar_cliente(cliente)
+        print(f"\n✓ Cliente registrado correctamente: {cliente.descripcion()}")
+    except SoftwareFJError as e:
+        # Capturamos cualquier error de nuestro sistema
+        print(f"\n✗ Error: {e}")
+    except Exception as e:
+        # Cualquier otro error inesperado
+        print(f"\n✗ Error inesperado: {e}")
+
+
+def opcion_crear_servicio(gestor):
+    """Pide tipo de servicio y datos. Crea el objeto correspondiente."""
+    print("\n--- CREACIÓN DE NUEVO SERVICIO ---")
+    print("  1. Reserva de sala")
+    print("  2. Alquiler de equipo")
+    print("  3. Asesoría técnica")
+    try:
+        tipo = input("Tipo de servicio (1-3): ").strip()
+        identificador = input("Identificador (ej. SAL010): ").strip()
+        nombre = input("Nombre del servicio: ").strip()
+        tarifa = float(input("Tarifa base (número positivo): ").strip())
+
+        if tipo == "1":
+            cap = int(input("Capacidad (personas): ").strip())
+            servicio = ReservaSala(identificador, nombre, tarifa, cap)
+        elif tipo == "2":
+            stock = int(input("Stock disponible: ").strip())
+            servicio = AlquilerEquipo(identificador, nombre, tarifa, stock)
+        elif tipo == "3":
+            area = input("Área de experticia: ").strip()
+            servicio = AsesoriaTecnica(identificador, nombre, tarifa, area)
+        else:
+            print("\n✗ Opción no válida.")
+            return
+
+        gestor.registrar_servicio(servicio)
+        print(f"\n✓ Servicio creado: {servicio.descripcion()}")
+    except ValueError:
+        # Si el usuario escribe letras donde se esperaba un número
+        print("\n✗ Error: debe ingresar un número válido.")
+    except SoftwareFJError as e:
+        print(f"\n✗ Error: {e}")
+
+
+def opcion_crear_reserva(gestor):
+    """Crea una nueva reserva eligiendo cliente y servicio existentes."""
+    print("\n--- CREACIÓN DE NUEVA RESERVA ---")
+    # Validamos primero que existan clientes y servicios
+    if not gestor.listar_clientes():
+        print("✗ No hay clientes registrados. Registre uno primero.")
+        return
+    if not gestor.listar_servicios():
+        print("✗ No hay servicios registrados. Cree uno primero.")
+        return
+    try:
+        # Mostramos los clientes disponibles
+        print("\nClientes disponibles:")
+        for i, c in enumerate(gestor.listar_clientes(), 1):
+            print(f"  {i}. {c.descripcion()}")
+        idx_c = int(input("Número del cliente: ").strip()) - 1
+        cliente = gestor.listar_clientes()[idx_c]
+
+        # Mostramos los servicios disponibles
+        print("\nServicios disponibles:")
+        for i, s in enumerate(gestor.listar_servicios(), 1):
+            print(f"  {i}. {s.descripcion()}")
+        idx_s = int(input("Número del servicio: ").strip()) - 1
+        servicio = gestor.listar_servicios()[idx_s]
+
+        identificador = input("Identificador de la reserva (ej. RES010): ").strip()
+        duracion = float(input("Duración (horas/días): ").strip())
+
+        reserva = gestor.crear_reserva(identificador, cliente, servicio, duracion)
+        print(f"\n✓ Reserva creada: {reserva}")
+    except (ValueError, IndexError):
+        print("\n✗ Error: número de cliente o servicio no válido.")
+    except SoftwareFJError as e:
+        print(f"\n✗ Error: {e}")
+
+
+def opcion_listar(coleccion, titulo):
+    """Función genérica para listar clientes, servicios o reservas."""
+    print(f"\n--- {titulo} ---")
+    if not coleccion:
+        print("(Vacío)")
+        return
+    for i, item in enumerate(coleccion, 1):
+        # Las reservas usan __str__, los demás usan descripcion()
+        texto = str(item) if isinstance(item, Reserva) else item.descripcion()
+        print(f"  {i}. {texto}")
+
+
+def opcion_procesar_reserva(gestor):
+    """Confirma y procesa una reserva pendiente, calculando su costo total."""
+    print("\n--- CONFIRMAR Y PROCESAR RESERVA ---")
+    reservas = gestor.listar_reservas()
+    if not reservas:
+        print("✗ No hay reservas registradas.")
+        return
+    try:
+        for i, r in enumerate(reservas, 1):
+            print(f"  {i}. {r}")
+        idx = int(input("Número de la reserva a procesar: ").strip()) - 1
+        reserva = reservas[idx]
+
+        # Pedimos impuesto y descuento como opcionales
+        imp = input("Impuesto (Enter = 0.19): ").strip()
+        desc = input("Descuento (Enter = 0.0): ").strip()
+        impuesto = float(imp) if imp else 0.19
+        descuento = float(desc) if desc else 0.0
+
+        # Aquí se aplican los try/except del sistema interno automáticamente
+        reserva.confirmar()
+        costo = reserva.procesar(impuesto=impuesto, descuento=descuento)
+        print(f"\n✓ Reserva procesada exitosamente.")
+        print(f"  Costo total a pagar: ${costo:,.2f}")
+    except (ValueError, IndexError):
+        print("\n✗ Número de reserva no válido.")
+    except SoftwareFJError as e:
+        print(f"\n✗ Error: {e}")
+
+
+def menu_interactivo(gestor):
+    """Bucle principal del menú. Se repite hasta que el usuario elige salir."""
+    print("\n" + "=" * 70)
+    print("   MODO INTERACTIVO ACTIVADO")
+    print("   Ahora usted puede crear sus propios clientes, servicios y reservas.")
+    print("=" * 70)
+
+    while True:
+        imprimir_menu()
+        opcion = input("Elija una opción: ").strip()
+
+        if opcion == "1":
+            opcion_registrar_cliente(gestor)
+        elif opcion == "2":
+            opcion_crear_servicio(gestor)
+        elif opcion == "3":
+            opcion_crear_reserva(gestor)
+        elif opcion == "4":
+            opcion_listar(gestor.listar_clientes(), "CLIENTES REGISTRADOS")
+        elif opcion == "5":
+            opcion_listar(gestor.listar_servicios(), "SERVICIOS DISPONIBLES")
+        elif opcion == "6":
+            opcion_listar(gestor.listar_reservas(), "RESERVAS")
+        elif opcion == "7":
+            opcion_procesar_reserva(gestor)
+        elif opcion == "0":
+            print("\n¡Gracias por usar el sistema Software FJ!")
+            break
+        else:
+            print("\n✗ Opción no válida. Intente nuevamente.")
+
+        pausa()
+
+
+# ============================================================================
 #  PUNTO DE ENTRADA DEL PROGRAMA
 # ============================================================================
 if __name__ == "__main__":
-    # Se envuelve la simulación en un try/except/finally global para
-    # garantizar que cualquier error inesperado quede registrado y que
-    # el programa siempre cierre el sistema de logging correctamente.
+    # Se envuelve todo en un try/except/finally global para garantizar
+    # que cualquier error inesperado quede registrado y que el programa
+    # siempre cierre el sistema de logging correctamente.
     try:
+        # PASO 1: Ejecutar las 10 operaciones simuladas (lo que pide la guía)
         ejecutar_simulacion()
+
+        # PASO 2: Preguntar al usuario si quiere usar el menú interactivo
+        print("\n")
+        respuesta = input(
+            "¿Desea acceder al menú interactivo para crear sus propios "
+            "clientes, servicios y reservas? (s/n): ").strip().lower()
+        if respuesta == "s" or respuesta == "si" or respuesta == "sí":
+            # Creamos un nuevo gestor limpio para el modo interactivo
+            gestor_interactivo = GestorSoftwareFJ()
+            menu_interactivo(gestor_interactivo)
+        else:
+            print("\nFinalizando programa. ¡Hasta pronto!")
+    except KeyboardInterrupt:
+        # Si el usuario presiona Ctrl+C, salimos limpiamente
+        print("\n\nPrograma interrumpido por el usuario.")
     except Exception as e:
         logger.critical(f"Error inesperado en la ejecución principal: {e}")
         print(f"\n[CRÍTICO] El sistema reportó un error: {e}")
